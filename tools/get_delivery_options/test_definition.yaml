@@ -1,0 +1,15 @@
+tests:
+    test_1:
+        parameters:
+            product_items:
+                - product_retailer_id: "73#1"
+                  quantity: 10
+                  item_price: 101600
+                  currency: "BRL"
+            postal_code: "04538133"
+            delivery_method: "delivery"
+        credentials:
+            BASE_URL: ""
+            VTEX_API_APPKEY: ""
+            VTEX_API_APPTOKEN: ""
+

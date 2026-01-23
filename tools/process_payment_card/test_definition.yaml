@@ -1,0 +1,23 @@
+tests:
+    test_1:
+        parameters:
+            product_items:
+                - product_retailer_id: "73#1"
+                  quantity: 10
+                  item_price: 1016
+                  currency: "BRL"
+                  name: "Macarrão Fettuccine COLAVITA 500g"
+            email: "leonardo.amaral@vtex.com"
+            document: "056789023"
+            contact_name: "Leonardo Amaral"
+            postal_code: "01452000"
+            number_house: "10"
+            address_complement: ""
+            delivery_method: "delivery"
+            sla_id: "Normal"
+            cvv: ""
+            payment_method:
+                - payment_method: "offsite_card_pay"
+                  payment_timestamp: 
+                  last_four_digits: ""
+                  credential_id: ""

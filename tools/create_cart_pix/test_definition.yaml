@@ -1,0 +1,17 @@
+tests:
+    test_1:
+        parameters:
+            product_items:
+                - product_retailer_id: "123#seller1"
+                  quantity: 1
+                  item_price: 10000
+                  currency: "BRL"
+            postal_code: "01310100"
+            document: "12345678901"
+            email: "test@example.com"
+            delivery_method: "delivery"
+            sla_id: "1"
+            number_house: "123"
+            address_complement: ""
+            contact_name: "Test User"
+

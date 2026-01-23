@@ -1,0 +1,14 @@
+tests:
+    test_1:
+        parameters:
+            product_items:
+                - product_retailer_id: "73#1"
+                  quantity: 10
+                  name: "Macarrão Fettuccine COLAVITA 500g"
+                  item_price: 101600  # R$ 1.016,00 em centavos (valor total)
+            email: ""
+        contact:
+            channel_uuid: ""  # Preencher com UUID do canal WhatsApp
+            urn: ""  # Preencher com número de teste
+        project:
+            uuid: ""  # Preencher com UUID do projeto Weni

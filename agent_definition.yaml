@@ -1,0 +1,221 @@
+agents:
+    payment_agent_checkout:
+        credentials:
+            BASE_URL:
+                label: "Base URL"
+                placeholder: "https://teste.myvtex.com"
+                is_confidential: false
+            ACCOUNT_NAME:
+                label: "Account Name"
+                placeholder: "teste"
+                is_confidential: false
+            STORE_URL:
+                label: "Store URL"
+                placeholder: "www.teste.bravtexstores.com.br"
+                is_confidential: false
+            API_TOKEN:
+                label: "Project Token"
+                placeholder: "1234567890"
+                is_confidential: true
+            VTEX_API_APPTOKEN:
+                label: "VTEX App Token"
+                placeholder: "SHGDFJGVJWDIKVÇLFKVBKVÇKFMEPMHMYZANOVRNTXBTHTUDTPEDFNWEIHFWOIRHGFFÇOEIKFGHIOMFDPFKQEWNQWERTYFJHFVWEGFB"
+                is_confidential: true
+            VTEX_API_APPKEY:
+                label: "VTEX App Key"
+                placeholder: "vtexappkey-TESTE-VGJTYY"
+                is_confidential: true
+        name: "Checkout Agent"
+        description: "Agent responsible for the checkout process, this agent can make a cart for a customer and process payments via credit card or PIX. For credit card payments, it sends a confirmation message to the user. When the user confirms, the payment is processed. For PIX payments, it generates a PIX code for the user to complete the payment."
+        instructions:
+            # CONTEXTO GERAL
+            - "You are an expert in processing checkout and payment information for customer orders."
+            - "Whenever you receive the parameter product_items, you must start the checkout flow."
+            - "Always when the tool needs the product_items parameter, you must format the product_items following the following format: [{\"product_retailer_id\": \"id#seller\", \"quantity\": 1, \"name\": \"Product Name\", \"item_price\": 25900, \"currency\": \"BRL\"}]. IMPORTANT: 'name' is required for WhatsApp messages, 'item_price' must be in cents (25900 = R$259.00)."
+            - "Never make up the product_retailer_id or any product information. All product information must be informed to you by the manager."
+            - "Only request the necessary data according to the client's payment preferences."
+            
+            # INÍCIO DO FLUXO
+            - "STEP 1: Ask the user which payment method they prefer: CREDIT CARD or PIX. Skip this step if you already have this information."
+            
+            # PASSOS COMUNS - DELIVERY (Steps 2-4)
+            - "STEP 2: Ask for the delivery method: 'delivery' (entrega) or 'pickup-in-point' (retirada em loja). Skip if you already have this information."
+            - "STEP 3: Ask for the user's postal code (CEP)."
+            - "STEP 4: Use the get_delivery_options tool with product_items, postal_code and delivery_method to retrieve available options. Present the options to the user and ask which one they prefer. IMPORTANT: Each option includes 'id' (sla_id) and 'price' (shipping value in cents) - you will need both values in the next steps."
+            
+            # FLUXO PIX (Steps 5-6)
+            - "STEP 5 (PIX): After the user selects a delivery option, collect the remaining required data: email, document (CPF), contact_name (full name), number_house (skip if pickup-in-point, use the pickup point address), and optionally address_complement."
+            - "STEP 6 (PIX): Use the create_cart_pix tool with all collected data including the sla_id from the chosen delivery option to generate the PIX code. The flow ends here."
+            
+            # FLUXO CARTÃO DE CRÉDITO (Steps 5-7)
+            - "STEP 5 (CARD): After the user selects a delivery option, collect the user's email address. Then use the create_cart_card tool with product_items, email, and shipping_value (use the 'price' field from the selected delivery option as shipping_value). This will retrieve saved payment information and send a WhatsApp confirmation message with the correct shipping cost. Inform the user they will receive a message to confirm the payment."
+            - "STEP 6 (CARD): When the user confirms (you will receive a payment_method JSON object), collect the remaining required data: document (CPF), contact_name (full name), number_house (skip if pickup-in-point, use the pickup point address), and optionally address_complement."
+            - "STEP 6.1 (CARD): Ask the user for the CVV code of the card. This code is required to process the payment. IMPORTANT: The CVV code is a 3-digit code printed on the back of the card, not the card number."
+            - "STEP 7 (CARD): Use the process_payment_card tool with all collected data including the sla_id from the chosen delivery option, plus the payment_method object to create the cart and process the payment. The transaction is created within this tool."
+            
+            # REGRAS IMPORTANTES - PIX
+            - "Never say the PIX code or payment link will be sent by email."
+            - "When the PIX was already sent to the user, just state that the PIX payment was created successfully, don't add anything else."
+            - "When you receive the PIX code and it was not already sent to the user, you must respond with the code for payment."
+            - "NEVER send a checkout link for PIX payments. PIX payments must be done with the pix copy paste code. When a PIX payment is successfully created and you don't receive the code, the user automatically received the PIX code — you must NOT send any link."
+            
+            # REGRAS IMPORTANTES - DELIVERY
+            - "If the user chooses pickup-in-point but it's not available for their region, inform them and ask if they would like to continue with delivery at their address."
+            - "When the delivery option is pickup-in-point, don't ask the user for the address number, use the number from the chosen pickup point."
+            - "When the user asks for delivery options only, just execute the get_delivery_options tool and inform the options without generating any checkout link or code."
+        guardrails:
+            - "Don't talk about politics, religion or any other sensitive topic. Keep it neutral."
+        tools:
+            - create_cart_card:
+                name: "Create Cart Credit Card"
+                source:
+                    path: "tools/create_cart_card"
+                    entrypoint: "main.CreateCart"
+                    path_test: "test_definition.yaml"
+                description: "Retrieves payment information from customer email and sends WhatsApp confirmation message with shipping value. Cart creation and payment processing is done in process_payment_card."
+                parameters:
+                    - email:
+                        description: "Customer email address to retrieve saved payment information"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - product_items:
+                        description: "Array of products in the format [{\"product_retailer_id\": \"id#seller\", \"quantity\": 1, \"name\": \"Product Name\", \"item_price\": 25900}]. IMPORTANT: 'name' is required for WhatsApp message, 'item_price' must be in cents."
+                        type: "array"
+                        required: true
+                    - shipping_value:
+                        description: "Shipping value in cents from the selected delivery option (the 'price' field returned by get_delivery_options tool)"
+                        type: "number"
+                        required: true
+            - create_cart_pix:
+                name: "Create Cart PIX"
+                source:
+                    path: "tools/create_cart_pix"
+                    entrypoint: "main.CreateCart"
+                    path_test: "test_definition.yaml"
+                description: "Function to create a cart for a customer and process payment via PIX (instant payments)"
+                parameters:
+                    - product_items:
+                        description: "Array of products in the format [{\"product_retailer_id\": \"id#seller\", \"quantity\": 1, \"name\": \"Product Name\", \"item_price\": 25900}]. 'item_price' must be in cents."
+                        type: "array"
+                        required: true
+                    - postal_code:
+                        description: "Customer postal code without special characters"
+                        type: "string"
+                        contact_field: true
+                        required: true
+                    - document:
+                        description: "Customer document number (CPF) without special characters"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - email:
+                        description: "Customer email"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - delivery_method:
+                        description: "Delivery method: 'delivery' for home delivery or 'pickup-in-point' for store pickup"
+                        type: "string"
+                        required: true
+                    - sla_id:
+                        description: "SLA ID, this information will be provided by Get Delivery Options tool, but the user must provide it"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - number_house:
+                        description: "Number of the house that will receive the order"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - address_complement:
+                        description: "Complement of the address, if necessary (apartment number, point of refference, etc)"
+                        type: "string"
+                        required: false
+                        contact_field: true
+                    - contact_name:
+                        description: "Complete name of the user, including first and last name."
+                        type: "string"
+                        required: true
+                        contact_field: true
+            - process_payment_card:
+                name: "Process Payment Card"
+                source:
+                    path: "tools/process_payment_card"
+                    entrypoint: "main.ProcessPaymentCard"
+                    path_test: "test_definition.yaml"
+                description: "Creates cart, adds profile/shipping/items, processes credit card payment after WhatsApp confirmation. Receives payment_method with credential_id and last_four_digits."
+                parameters:
+                    - product_items:
+                        description: "Array of products in the format [{'product_retailer_id': 'id#seller', 'quantity': 1, 'name': 'Product Name', 'item_price': 25900}]. 'item_price' must be in cents."
+                        type: "array"
+                        required: true
+                    - email:
+                        description: "Customer email address to retrieve saved payment information"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - document:
+                        description: "Customer document number (CPF) without special characters"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - contact_name:
+                        description: "Complete name of the user, including first and last name."
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - postal_code:
+                        description: "Customer postal code without special characters"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - number_house:
+                        description: "Number of the house that will receive the order"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - address_complement:
+                        description: "Complement of the address, if necessary (apartment number, point of reference, etc)"
+                        type: "string"
+                        required: false
+                        contact_field: true
+                    - delivery_method:
+                        description: "Delivery method: 'delivery' for home delivery or 'pickup-in-point' for store pickup"
+                        type: "string"
+                        required: true
+                    - sla_id:
+                        description: "SLA ID from the selected delivery option provided by the get_delivery_options tool"
+                        type: "string"
+                        required: true
+                        contact_field: true
+                    - payment_method:
+                        description: "Payment method data from WhatsApp confirmation as JSON string. Should contain payment_method object with credential_id, last_four_digits, payment_method, and payment_timestamp. Note: reference_id is not used as transactionId - the transaction is created within this tool."
+                        type: "array"
+                        required: true
+                    - cvv:
+                        description: "CVV code of the card"
+                        type: "string"
+                        required: true
+                        contact_field: true
+            - get_delivery_options:
+                name: "Get Delivery Options"
+                source:
+                    path: "tools/get_delivery_options"
+                    entrypoint: "main.GetDeliveryOptions"
+                    path_test: "test_definition.yaml"
+                description: "Function to get available delivery options (delivery or pickup-in-point) for the customer's postal code"
+                parameters:
+                    - product_items:
+                        description: "Array of products in the format [{\"product_retailer_id\": \"id#seller_id\", \"quantity\": 1, \"name\": \"Product Name\", \"item_price\": 25900}]. 'item_price' must be in cents."
+                        type: "array"
+                        required: true
+                    - postal_code:
+                        description: "Customer postal code without special characters"
+                        type: "string"
+                        contact_field: true
+                        required: true
+                    - delivery_method:
+                        description: "Delivery method: 'delivery' for home delivery or 'pickup-in-point' for store pickup"
+                        type: "string"
+                        required: true
