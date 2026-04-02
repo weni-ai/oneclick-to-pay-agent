@@ -1,0 +1,11 @@
+tests:
+    test_1:
+        parameters:
+            product_names: ["leite integral"]
+        contact:
+            fields:
+                segment: '{"campaigns":null,"channel":"1","priceTables":null,"regionId":"","utm_campaign":null,"utm_source":null,"utmi_campaign":null,"currencyCode":"BRL","currencySymbol":"R$","countryCode":"BRA","cultureInfo":"pt-BR","channelPrivacy":"public"}'
+        project:
+            uuid: "8cf4c7a7-9aeb-40ff-a8e1-38341c537234"
+        credentials:
+            auth_token: ""

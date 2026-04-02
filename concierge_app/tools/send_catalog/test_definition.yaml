@@ -1,0 +1,40 @@
+tests:
+  test_web_flat_kv_grocery:
+    parameters:
+      product_skus:
+        - "category_name:Arroz branco (tipo 1)"
+        - "skus_ids:[\"2770#1\",\"6303#1\",\"18330#1\",\"22185#1\",\"21288#1\",\"2768#1\",\"16871#1\"]"
+      simple_message: "Encontrei opções de arroz no catálogo — branco, integral e algumas variações especiais (ex.: para risoto e com temperos)."
+      header_text: "Arroz disponível no catálogo"
+      footer_text: "Escolha a opção que preferir"
+      action_button_text: "Ver produto"
+      postal_code: ""
+    project:
+      uuid: "51b12e75-11c8-42c3-bfb7-92da7118845f"
+      flows_url: "https://flows.weni.ai"
+    credentials:
+      auth_token: ""
+    contact:
+      urn: "ext:645612295425@"
+
+  # test_whatsapp_fashion:
+  #   parameters:
+  #     product_skus:
+  #       - category_name: "Roupas Masculinas"
+  #         skus_ids:
+  #           - "220#bravtexfashionstore02"
+  #           - "222#bravtexfashionstore02"
+  #           - "224#bravtexfashionstore01"
+  #       - category_name: "Roupas Femininas"
+  #         skus_ids:
+  #           - "255#bravtexfashionstore01"
+  #           - "509#bravtexfashionstore01"
+  #           - "323#bravtexfashionstore02"
+  #     simple_message: "Separei algumas peças que combinam com o que você procura!"
+  #     header_text: "Moda Masculina & Feminina"
+  #     footer_text: "Toque para ver detalhes e comprar"
+  #   project:
+  #     uuid: ""
+  #     auth_token: ""
+  #   contact:
+  #     urn: "whatsapp:5582999893640"

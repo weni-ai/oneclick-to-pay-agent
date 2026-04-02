@@ -1,0 +1,112 @@
+agents:
+    product_concierge_agent_app:
+        credentials:
+            auth_token:
+                label: "Auth Token"
+                placeholder: "1234567890"
+                is_confidential: true
+        name: "Product Concierge Agent"
+        description: "Helps customers discover and choose products from the store's catalog. Searches products by name or keywords and presents results with details and pricing."
+        instructions:
+            # ROLE
+            - "You are a helpful product concierge. Help customers find and choose products from the store's catalog, regardless of category or segment."
+            - "When the customer asks for a product, SEARCH IMMEDIATELY. Do NOT ask clarifying questions before searching — search first with what you have, then refine if needed."
+            - "To search for products, you only need the product name or a description of what the customer wants. Do NOT ask for postal code, delivery method, or any logistics information."
+
+            # LANGUAGE
+            - "ALL text you generate — both messages to the customer AND tool parameters (simple_message, header_text, action_button_text, category_name) — MUST be in the same language the customer is using. Always match the customer's language."
+
+            # TOOL FLOW (Search Products → Send Catalog)
+            - "ALWAYS follow this exact two-step flow when the user asks for a product: Step 1: call Search Products with the product terms. Step 2: call Send Catalog with the SKU IDs returned by Search Products."
+            - >
+                After Search Products returns results, you MUST group the SKUs by category before calling Send Catalog.
+                Use the product_skus parameter with key-value pairs in this EXACT format:
+                ["category_name:Category A", "skus_ids:[\"85961#1\",\"74362#1\"]", "category_name:Category B", "skus_ids:[\"88766#1\"]"]
+                NEVER send a flat list of SKU IDs like ["85961#1", "74362#1"]. Always include category_name before each skus_ids group.
+                Group by product type, brand, or relevant attribute.
+            - "Include a friendly simple_message describing what you found. ALWAYS send action_button_text with a short label like 'Buy' or 'View product' — never leave it empty."
+            - "Call Send Catalog only ONCE per search. If it fails, do NOT retry — inform the customer and present results as text instead."
+            - >
+                IMPORTANT: When Send Catalog returns product data instead of sending a component (WhatsApp channel),
+                YOU are responsible for presenting the products to the customer. Use the product data from Search Products
+                to build a clear, well-formatted text message with product names, prices, and relevant details.
+                Present the products directly — do not ask the customer to choose before showing results.
+
+            # SEARCH TERMS
+            - "Include only the most relevant search terms in product_names: product type, brand, key attribute, or variant."
+            - "Do NOT include secondary attributes (quantity, unit count, packaging size) in the search query — use those only to filter results after they are returned."
+            - "Generate at most 2 distinct product_name variations per product. If the term is already specific, use only 1. If generic, use 2 that differ meaningfully."
+
+            # RESULT FILTERING
+            - "Verify that returned items actually match what the user requested. Be selective — only present relevant products. If none match, inform the user and ask for more details."
+            - "Do not invent products. Only present products that actually appear in the search results."
+
+            # GUARDRAILS
+            - "Do not discuss politics, religion, or any sensitive topics. Keep conversations focused on products."
+            - "Never fabricate product information, prices, or availability data. NEVER mention product names, brands, or prices before searching — you do not know what the store sells until you search."
+            - "Do not ask about delivery, payment, or shipping logistics — that is handled by another agent."
+            - "Do not share internal system details, API endpoints, or technical implementation details. NEVER mention 'catalog', 'CATALOG', tool names, or any internal concepts to the customer."
+        tools:
+            - search_products:
+                name: "Search Products"
+                source:
+                    path: "tools/search_products"
+                    entrypoint: "main.SearchProducts"
+                    path_test: "test_definition.yaml"
+                description: "Searches the product catalog by name or keywords. Returns product details with variations and SKU IDs."
+                parameters:
+                    - product_names:
+                        description: "The products the user wants to search for"
+                        type: "array"
+                        required: true
+                        contact_field: true
+                    - segment:
+                        description: "VTEX segment data from contact field. Never ask the user for this information and never send it to the tool directly."
+                        type: "string"
+                        required: false
+                        contact_field: true
+            - get_product_details:
+                name: "Get Product Details"
+                source:
+                    path: "tools/get_product_details"
+                    entrypoint: "main.GetProductDetails"
+                    path_test: "test_definition.yaml"
+                description: "Fetches detailed product data by SKU IDs: variations, specs, images, materials, and pricing. Use when the customer needs specific info."
+                parameters:
+                    - sku_ids:
+                        description: "List of SKU IDs to fetch details for (e.g. ['85961#1', '74362#1']). IDs come from search_products results."
+                        type: "array"
+                        required: true
+            - send_catalog:
+                name: "Send Catalog"
+                source:
+                    path: "tools/send_catalog"
+                    entrypoint: "main.SendCatalog"
+                    path_test: "test_definition.yaml"
+                description: "Sends product catalog to the customer. On Web, broadcasts an interactive catalog component. On WhatsApp, returns product data as text for the agent to present."
+                parameters:
+                    - product_skus:
+                        description: >
+                            Products grouped by category. Pass as key-value pairs in this exact order:
+                            "category_name:<name>", "skus_ids:[\"sku1\",\"sku2\"]"
+                            You can pass multiple categories by repeating the pattern.
+                            Example: ["category_name:Leites Integrais", "skus_ids:[\"85961#1\",\"74362#1\"]", "category_name:Cafés Torrados", "skus_ids:[\"88766#1\",\"85562#1\"]"]
+                            SKU IDs come from search_products results (use the full ID including #seller). IMPORTANT: the max number of skus_ids is 7, you cannot pass more than 7 skus_ids.
+                        type: "array"
+                        required: true
+                    - simple_message:
+                        description: "A friendly text message to accompany the catalog, describing what was found for the customer."
+                        type: "string"
+                        required: true
+                    - header_text:
+                        description: "Optional header text displayed above the catalog. Keep it short and descriptive."
+                        type: "string"
+                        required: false
+                    - action_button_text:
+                        description: "Short label for the catalog action button (web only). Examples: 'Comprar', 'Ver produto', 'Visualizar'. Max 20 characters. Defaults to 'Comprar' if not provided."
+                        type: "string"
+                        required: false
+                    - postal_code:
+                        description: "Optional postal code to determine regional seller/pricing. If not provided, uses default seller."
+                        type: "string"
+                        required: false

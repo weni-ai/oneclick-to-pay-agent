@@ -646,7 +646,7 @@ class CreateCart(Tool):
             print("ERRO: company_name não fornecido")
             return False
         
-        weni_url = "https://flows.weni.ai/api/v2/whatsapp_broadcasts.json"
+        weni_url = "https://flows.stg.cloud.weni.ai/api/v2/whatsapp_broadcasts.json"
     
         
         items = []

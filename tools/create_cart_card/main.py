@@ -47,7 +47,7 @@ class CreateCart(Tool):
         product_items = context.parameters.get("product_items", [])
 
         base_url = context.credentials.get("BASE_URL", "")
-        api_token = context.credentials.get("API_TOKEN", "")
+        auth_token = context.project.get("auth_token", "")
 
         channel_uuid = context.contact.get("channel_uuid", "")
         urn = context.contact.get("urn", "")
@@ -67,7 +67,7 @@ class CreateCart(Tool):
             whatsapp_response = self.send_message_broadcast_wpp(
                 payment_info, 
                 product_items, 
-                api_token, 
+                auth_token, 
                 channel_uuid, 
                 urn,
                 project_uuid,
@@ -123,7 +123,7 @@ class CreateCart(Tool):
         except Exception:
             return {"error": "Could not find payment information"}
 
-    def send_message_broadcast_wpp(self, payment_info, product_items, api_token, channel_uuid, urn, project_uuid, shipping_value):
+    def send_message_broadcast_wpp(self, payment_info, product_items, auth_token, channel_uuid, urn, project_uuid, shipping_value):
         """Sends a message broadcast to the user via WhatsApp asking if they want to use the saved card"""
         if not payment_info:
             return {"error": "Could not find payment information"}
@@ -227,13 +227,13 @@ class CreateCart(Tool):
             payload["project"] = project_uuid
         
         headers = {
-            "Authorization": f"Token {api_token}",
+            "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json"
         }
         
         try:
             response = requests.post(
-                "https://flows.weni.ai/api/v2/whatsapp_broadcasts.json",
+                "https://flows.stg.cloud.weni.ai/api/v2/whatsapp_broadcasts.json",
                 json=payload,
                 headers=headers
             )

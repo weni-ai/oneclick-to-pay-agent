@@ -15,7 +15,7 @@ tests:
             address_complement: ""
             delivery_method: "delivery"
             sla_id: "Normal"
-            cvv: ""
+            cvv: "626"
             payment_method:
                 - payment_method: "offsite_card_pay"
                   payment_timestamp: 

@@ -1,0 +1,6 @@
+tests:
+    test_1:
+        parameters:
+            sku_ids: ["14600#1", "3449#1"]
+        credentials:
+            auth_token: ""
