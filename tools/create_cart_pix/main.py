@@ -145,7 +145,6 @@ class CreateCart(Tool):
         sla_id = context.parameters.get("sla_id", "")
         address_complement = context.parameters.get("address_complement","")
         
-        api_token = context.credentials.get("API_TOKEN", "")
         base_url = context.credentials.get("BASE_URL", "")
         vtex_appkey = context.credentials.get("VTEX_API_APPKEY", "")
         vtex_apptoken = context.credentials.get("VTEX_API_APPTOKEN", "")
@@ -229,7 +228,7 @@ class CreateCart(Tool):
             order_details = orderform_response.json() if orderform_response.status_code == 200 else {}
             
             # Chama Weni Flows APENAS se o PIX for válido (e usa o formato order_details)
-            weni_flows_success = self._send_to_weni_flows(urn, order_id, pix_code, company_name, pix_code_raw, product_items, order_details, api_token, channel_uuid)
+            weni_flows_success = self._send_to_weni_flows(urn, order_id, pix_code, company_name, pix_code_raw, product_items, order_details, auth_token, channel_uuid)
             
             if not weni_flows_success:
                 print("AVISO: Falha ao enviar para Weni Flows, mas o pedido foi criado com sucesso")

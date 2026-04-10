@@ -1,5 +1,5 @@
 agents:
-    payment_agent_checkout:
+    payment_agent_checkout_teste:
         credentials:
             BASE_URL:
                 label: "Base URL"
@@ -13,10 +13,6 @@ agents:
                 label: "Store URL"
                 placeholder: "www.teste.bravtexstores.com.br"
                 is_confidential: false
-            API_TOKEN:
-                label: "Project Token"
-                placeholder: "1234567890"
-                is_confidential: true
             VTEX_API_APPTOKEN:
                 label: "VTEX App Token"
                 placeholder: "SHGDFJGVJWDIKVÇLFKVBKVÇKFMEPMHMYZANOVRNTXBTHTUDTPEDFNWEIHFWOIRHGFFÇOEIKFGHIOMFDPFKQEWNQWERTYFJHFVWEGFB"
@@ -29,19 +25,11 @@ agents:
                 label: "WhatsApp CVV Flow ID"
                 placeholder: "1451561746318256"
                 is_confidential: false
-            PAYMENT_REGISTRATIONS_BASE_URL:
-                label: "Payment registrations API base URL"
-                placeholder: "https://913e-177-37-184-15.ngrok-free.app"
-                is_confidential: false
-            CHANNEL_UUID:
-                label: "Channel UUID (payment registration)"
-                placeholder: "847d81a0-7ab8-4fd9-9aad-56d7a46f0387"
-                is_confidential: false
-            PAYMENT_REGISTRATIONS_BEARER_TOKEN:
-                label: "Bearer token for payment-registrations API (optional if same as project auth)"
-                placeholder: ""
-                is_confidential: true
-        name: "Checkout Agent"
+        contact_fields:
+            - channel_uuid
+            - urn
+            - auth_token
+        name: "Checkout Agent TESTE"
         description: "Agent responsible for the checkout process, this agent can make a cart for a customer and process payments via credit card or PIX. For credit card payments, it sends a confirmation message to the user; after confirmation, a WhatsApp Flow collects the CVV. For PIX payments, it generates a PIX code for the user to complete the payment."
         instructions:
             # CONTEXTO GERAL
@@ -64,9 +52,9 @@ agents:
             - "STEP 6 (PIX): Use the create_cart_pix tool with all collected data including the sla_id from the chosen delivery option to generate the PIX code. The flow ends here."
             
             # FLUXO CARTÃO DE CRÉDITO (Steps 5-7)
-            - "STEP 5 (CARD): After the user selects a delivery option, collect the user's email address. Then use the create_cart_card tool with product_items, email, and shipping_value (use the 'price' field from the selected delivery option as shipping_value). This will retrieve saved payment information and send a WhatsApp confirmation message with the correct shipping cost. Inform the user they will receive a message to confirm the payment."
+            - "STEP 5 (CARD): After the user selects a delivery option, collect the user's email address. Then use the create_cart_card tool with product_items, email, and shipping_value (use the 'price' field from the selected delivery option as shipping_value). This sends a OneClickPayment confirmation via WhatsApp with the saved card info and order total. Inform the user they will receive a message to confirm the payment."
             - "STEP 6 (CARD): When the user confirms (you will receive a payment_method JSON object), collect the remaining required data: document (CPF), contact_name (full name), number_house (skip if pickup-in-point, use the pickup point address), and optionally address_complement."
-            - "STEP 7 (CARD): After confirmation, use the request_cvv_flow with the same data you would use for checkout: product_items, email, document, contact_name, postal_code, number_house, address_complement (if any), delivery_method, and sla_id. The tool creates the VTEX transaction, registers it with the payment backend, then sends the WhatsApp Flow for CVV. Optional: valor_pedido and final_cartao to override display strings; optional card_due_date (MM/YY) if required by your Flow. Do not ask for CVV in plain chat."
+            - "STEP 7 (CARD): After collecting all data, use request_cvv_flow with product_items, email, document, contact_name, postal_code, number_house, address_complement (if any), delivery_method, and sla_id. The tool creates the VTEX checkout, registers the payment, and sends a WhatsApp Flow for CVV collection. Do not ask for CVV in plain chat."
             
             # REGRAS IMPORTANTES - PIX
             - "Never say the PIX code or payment link will be sent by email."
@@ -87,7 +75,7 @@ agents:
                     path: "tools/create_cart_card"
                     entrypoint: "main.CreateCart"
                     path_test: "test_definition.yaml"
-                description: "Retrieves payment information from customer email and sends WhatsApp confirmation message with shipping value. After user confirms, use request_cvv_flow to collect CVV via WhatsApp Flow."
+                description: "Fetches saved card by email and sends OneClickPayment confirmation via WhatsApp. After user confirms, use request_cvv_flow to collect CVV."
                 parameters:
                     - email:
                         description: "Customer email address to retrieve saved payment information"
@@ -110,7 +98,7 @@ agents:
                     path_test: "test_definition.yaml"
                 description: "Function to create a cart for a customer and process payment via PIX (instant payments)"
                 parameters:
-                    - product_items:
+                    - product_items: 
                         description: "Array of products in the format [{\"product_retailer_id\": \"id#seller\", \"quantity\": 1, \"name\": \"Product Name\", \"item_price\": 25900}]. 'item_price' must be in cents."
                         type: "array"
                         required: true
@@ -159,7 +147,7 @@ agents:
                     path: "tools/request_cvv_flow"
                     entrypoint: "main.RequestCvvFlow"
                     path_test: "test_definition.yaml"
-                description: "Creates a full VTEX checkout and checkout transaction, fetches saved card info by email, registers flow_token and vtex_execution on payment-registrations (CHANNEL_UUID, PAYMENT_REGISTRATIONS_BASE_URL), then sends the CVV WhatsApp Flow via Weni Flows. Does not charge the card (no VTEX Vault) or call gatewayCallback. Requires contact channel_uuid and urn, project auth_token, VTEX credentials, and optional valor_pedido, final_cartao, card_due_date. Returns FinalResponse when the Flow is sent."
+                description: "Creates VTEX checkout, registers payment, and sends WhatsApp Flow for CVV collection. Does not charge the card. Returns FinalResponse."
                 parameters:
                     - product_items:
                         description: "Array of products [{\"product_retailer_id\": \"id#seller\", \"quantity\": 1, \"name\": \"Product Name\", \"item_price\": 25900}]. item_price in cents."

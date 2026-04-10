@@ -6,9 +6,10 @@ tests:
                   quantity: 10
                   name: "Macarrão Fettuccine COLAVITA 500g"
                   item_price: 101600  # R$ 1.016,00 em centavos (valor total)
-            email: ""
+            email: "leonardo.amaral@vtex.com"
         contact:
-            channel_uuid: ""  # Preencher com UUID do canal WhatsApp
-            urn: ""  # Preencher com número de teste
+            channel_uuid: "847d81a0-7ab8-4fd9-9aad-56d7a46f0387"  # Preencher com UUID do canal WhatsApp
+            urn: "whatsapp:5582999893640"  # Preencher com número de teste
         project:
-            uuid: ""  # Preencher com UUID do projeto Weni
+            uuid: "fa147fa6-5af0-4d99-9c00-043c89d97392"  # Preencher com UUID do projeto Weni
+            flows_url: "https://flows.stg.cloud.weni.ai"

@@ -1,6 +1,6 @@
 """
 request_cvv_flow: VTEX checkout → payment-registrations → WhatsApp Flow (CVV).
-Single module for Lambda/Weni (only main.py is packaged).
+Uses WhatsAppFlows broadcast instead of manual HTTP to Flows API.
 """
 
 from __future__ import annotations
@@ -12,23 +12,13 @@ from typing import Any
 
 import requests
 from weni import Tool
+from weni.broadcasts import WhatsAppFlows
 from weni.context import Context
 from weni.responses import FinalResponse, TextResponse
 
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-DEFAULT_WHATSAPP_FLOW_ID = "1495814778922275"
-DEFAULT_PAYMENT_REGISTRATIONS_BASE = "https://913e-177-37-184-15.ngrok-free.app"
-FLOWS_BROADCAST_URL = "https://flows.stg.cloud.weni.ai/api/v2/whatsapp_broadcasts.json"
 TRADE_POLICY = 1
 REQUEST_TIMEOUT_S = 60
-
-
-# ---------------------------------------------------------------------------
-# Small utilities
-# ---------------------------------------------------------------------------
+PAYMENT_REGISTRATIONS_BASE_URL = "https://payment.stg.cloud.weni.ai"
 
 
 def format_brl_cents(cents: Any) -> str:
@@ -94,7 +84,7 @@ class CheckoutSnapshot:
 
 
 class VtexCheckout:
-    """Checkout público VTEX até criar transação; sem Vault nem gatewayCallback."""
+    """Public VTEX checkout up to transaction creation; no Vault, no gatewayCallback."""
 
     def __init__(self, base_url: str, app_key: str, app_token: str) -> None:
         self._base = base_url.rstrip("/")
@@ -361,7 +351,7 @@ class VtexCheckout:
 
 
 class RequestCvvFlow(Tool):
-    """Registra contexto de pagamento e envia Flow do WhatsApp para coletar CVV."""
+    """Registers payment context and sends WhatsApp Flow to collect CVV."""
 
     def execute(self, context: Context) -> FinalResponse | TextResponse:
         p = context.parameters
@@ -369,7 +359,11 @@ class RequestCvvFlow(Tool):
         contact = context.contact
         project = context.project
 
-        err = self._validate_early(cred, contact, project)
+        channel_uuid = contact.get("channel_uuid", "")
+        auth_token = project.get("auth_token", "")
+        urn = contact.get("urn", "")
+
+        err = self._validate_early(channel_uuid, urn, auth_token)
         if err:
             return err
 
@@ -381,44 +375,40 @@ class RequestCvvFlow(Tool):
         if isinstance(display, TextResponse):
             return display
 
-        flow_token = self._make_flow_token(contact.get("urn", ""))
-        vtex_exec = self._build_vtex_execution(
-            cred, p, snap, display["card_due_date"]
-        )
+        flow_token = self._make_flow_token(urn)
+        vtex_exec = self._build_vtex_execution(cred, p, snap, display["card_due_date"])
 
-        reg = self._post_registration(
-            cred, project, contact.get("urn", ""), flow_token, vtex_exec
-        )
+        reg = self._post_registration(channel_uuid, auth_token, urn, flow_token, vtex_exec)
         if reg:
             return reg
 
-        return self._post_whatsapp_flow(cred, project, contact, display, flow_token)
+        flow_id = cred.get("WHATSAPP_CVV_FLOW_ID", "")
+
+        self.send_broadcast(WhatsAppFlows(
+            text="Para finalizar sua compra, preencha o seguinte dado",
+            flow_id=str(flow_id),
+            flow_cta="Confirmar Agora",
+            flow_screen="COLETAR_DADO",
+            flow_data={
+                "valor_pedido": display["valor_pedido"],
+                "final_cartao": display["final_cartao"],
+            },
+            flow_mode="draft",
+            flow_token=flow_token,
+        ))
+
+        return FinalResponse()
 
     @staticmethod
-    def _validate_early(cred: dict, contact: dict, project: dict) -> TextResponse | None:
-        if not cred.get("CHANNEL_UUID"):
-            return TextResponse(
-                data=json.dumps(
-                    {"error": "CHANNEL_UUID credential is required for payment registration"}
-                )
-            )
-        bearer = cred.get("PAYMENT_REGISTRATIONS_BEARER_TOKEN") or project.get(
-            "auth_token", ""
-        )
-        if not bearer:
-            return TextResponse(
-                data=json.dumps(
-                    {
-                        "error": "PAYMENT_REGISTRATIONS_BEARER_TOKEN or project auth_token is required"
-                    }
-                )
-            )
-        if not contact.get("channel_uuid"):
+    def _validate_early(channel_uuid: str, urn: str, auth_token: str) -> TextResponse | None:
+        if not channel_uuid:
             return TextResponse(
                 data=json.dumps({"error": "channel_uuid is required on contact"})
             )
-        if not contact.get("urn"):
+        if not urn:
             return TextResponse(data=json.dumps({"error": "contact urn is required"}))
+        if not auth_token:
+            return TextResponse(data=json.dumps({"error": "project auth_token is required"}))
         return None
 
     def _run_vtex(self, context: Context) -> CheckoutSnapshot | TextResponse:
@@ -457,11 +447,7 @@ class RequestCvvFlow(Tool):
             final = snap.payment_info.get("lastFourDigits", "")
         if not final:
             return TextResponse(
-                data=json.dumps(
-                    {
-                        "error": "final_cartao is empty and could not be derived from saved card profile"
-                    }
-                )
+                data=json.dumps({"error": "final_cartao is empty and could not be derived from saved card profile"})
             )
         return {"valor_pedido": valor, "final_cartao": final, "card_due_date": due}
 
@@ -501,29 +487,23 @@ class RequestCvvFlow(Tool):
 
     @staticmethod
     def _post_registration(
-        cred: dict,
-        project: dict,
+        channel_uuid: str,
+        auth_token: str,
         urn: str,
         flow_token: str,
         vtex_execution: dict[str, Any],
     ) -> TextResponse | None:
-        base = (
-            cred.get("PAYMENT_REGISTRATIONS_BASE_URL") or DEFAULT_PAYMENT_REGISTRATIONS_BASE
-        ).rstrip("/")
-        url = f"{base}/v1/payment-registrations"
-        bearer = cred.get("PAYMENT_REGISTRATIONS_BEARER_TOKEN") or project.get(
-            "auth_token", ""
-        )
+        url = f"{PAYMENT_REGISTRATIONS_BASE_URL}/v1/payment-registrations"
         body = {
             "flow_token": flow_token,
-            "channel_uuid": cred.get("CHANNEL_UUID", ""),
+            "channel_uuid": channel_uuid,
             "contact_urn": urn,
             "vtex_execution": vtex_execution,
         }
+        print("body: ", body)
         headers = {
-            "Authorization": f"Bearer {bearer}",
+            "Authorization": f"Bearer {auth_token}",
             "Content-Type": "application/json",
-            "ngrok-skip-browser-warning": "true",
         }
         r = requests.post(url, headers=headers, json=body, timeout=REQUEST_TIMEOUT_S)
         if r.status_code in (200, 201, 202, 204):
@@ -534,70 +514,9 @@ class RequestCvvFlow(Tool):
         except Exception:
             pass
         return TextResponse(
-            data=json.dumps(
-                {
-                    "error": "Payment registration failed",
-                    "status": r.status_code,
-                    "detail": detail,
-                }
-            )
+            data=json.dumps({
+                "error": "Payment registration failed",
+                "status": r.status_code,
+                "detail": detail,
+            })
         )
-
-    def _post_whatsapp_flow(
-        self,
-        cred: dict,
-        project: dict,
-        contact: dict,
-        display: dict,
-        flow_token: str,
-    ) -> FinalResponse | TextResponse:
-        auth_token = project.get("auth_token", "")
-        if not auth_token:
-            return TextResponse(
-                data=json.dumps(
-                    {"error": "project auth_token is required to send WhatsApp flow"}
-                )
-            )
-        flow_id = cred.get("WHATSAPP_CVV_FLOW_ID") or DEFAULT_WHATSAPP_FLOW_ID
-        payload = {
-            "urns": [contact.get("urn")],
-            "channel": contact.get("channel_uuid"),
-            "msg": {
-                "text": "Para finalizar sua compra, preencha o seguinte dado",
-                "interaction_type": "flow_msg",
-                "flow_message": {
-                    "flow_id": str(flow_id),
-                    "flow_cta": "Confirmar Agora",
-                    "flow_mode": "published",
-                    "flow_screen": "COLETAR_DADO",
-                    "flow_data": {
-                        "valor_pedido": display["valor_pedido"],
-                        "final_cartao": display["final_cartao"],
-                    },
-                    "flow_token": flow_token,
-                },
-            },
-        }
-        flow_headers = {
-            "Authorization": f"Bearer {auth_token}",
-            "Content-Type": "application/json",
-        }
-        r = requests.post(
-            FLOWS_BROADCAST_URL, headers=flow_headers, json=payload, timeout=REQUEST_TIMEOUT_S
-        )
-        if r.status_code not in (200, 201, 202):
-            detail: Any = r.text
-            try:
-                detail = r.json()
-            except Exception:
-                pass
-            return TextResponse(
-                data=json.dumps(
-                    {
-                        "error": "Failed to send CVV WhatsApp flow",
-                        "status": r.status_code,
-                        "detail": detail,
-                    }
-                )
-            )
-        return FinalResponse()

@@ -15,9 +15,8 @@ tests:
             address_complement: ""
             delivery_method: "delivery"
             sla_id: "Normal"
-            cvv: "626"
-            payment_method:
-                - payment_method: "offsite_card_pay"
-                  payment_timestamp: 
-                  last_four_digits: "2715"
-                  credential_id: "1234567890"
+        contact:
+            channel_uuid: "847d81a0-7ab8-4fd9-9aad-56d7a46f0387" # canal WhatsApp (broadcast)
+            urn: "whatsapp:5582999893640"
+        project:
+            flows_url: "https://flows.stg.cloud.weni.ai"
